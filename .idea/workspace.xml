@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="46a25cb4-2433-4bbd-8ced-a9aade134df4" name="变更" comment="首次提交饥荒云服脚本">
+      <change afterPath="$PROJECT_DIR$/.idea/DoNotStarveTogether.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/image/dst文件.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/image/停止世界.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/image/发送消息.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/image/启动世界.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/image/回档.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/image/文件所在目录.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/image/文件目录结构.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/image/查询状态.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/image/配置区.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/image/重置世界.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/饥荒云服管理脚本/dst.sh" beforeDir="false" afterPath="$PROJECT_DIR$/饥荒云服管理脚本/dst.sh" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="MarkdownSettingsMigration">
+    <option name="stateVersion" value="1" />
+  </component>
+  <component name="ProjectId" id="2BN6ZDgRN6T0JXhcIDG0wTMJXIm" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
+  <component name="ProjectViewState">
+    <option name="showExcludedFiles" value="false" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
+    <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
+    <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/image" />
+    <property name="nodejs_package_manager_path" value="npm" />
+    <property name="settings.editor.selected.configurable" value="org.jetbrains.plugins.github.ui.GithubSettingsConfigurable" />
+  </component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/image" />
+    </key>
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/image" />
+      <recent name="$PROJECT_DIR$" />
+    </key>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="应用程序级" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="默认任务">
+      <changelist id="46a25cb4-2433-4bbd-8ced-a9aade134df4" name="变更" comment="" />
+      <created>1656734252219</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1656734252219</updated>
+      <workItem from="1656734254762" duration="58739000" />
+      <workItem from="1656829771181" duration="12948000" />
+    </task>
+    <task id="LOCAL-00001" summary="首次提交饥荒云服脚本">
+      <created>1656832700617</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1656832700617</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="首次提交饥荒云服脚本" />
+    <option name="LAST_COMMIT_MESSAGE" value="首次提交饥荒云服脚本" />
+  </component>
+</project>

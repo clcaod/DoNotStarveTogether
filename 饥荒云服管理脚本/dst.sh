@@ -5,13 +5,15 @@
 # Author: tough
 # 2022-07-02
 #
+# GitHub链接：https://github.com/clcaod/DoNotStarveTogether.git
+#
 
 #-------------------------------------------配置区----------------------------------------------------------------------#
 
 # 目录路径配置 ###########################################################################################################
 
-# SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"      # 使用这条语句需要脚本放置在饥荒安装目录的bin目录下
-SCRIPT_DIR="$(cd ~/dstserver/bin64/ && pwd)"                      # 使用这条语句需要替换为实际安装目录
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"      # 使用这条语句需要脚本放置在饥荒安装目录的bin目录下
+#SCRIPT_DIR="$(cd ~/dstserver/bin64/ && pwd)"                      # 使用这条语句需要替换为实际安装目录
 
 CLUSTER_PATH="$(cd ~/.klei/DoNotStarveTogether/ && pwd)"            # 饥荒默认存档目录，如果不正确需要修改
 
@@ -19,7 +21,6 @@ CLUSTER_PATH="$(cd ~/.klei/DoNotStarveTogether/ && pwd)"            # 饥荒默�
 
 LEFT_VAL=10800				            # 端口范围下边界
 RIGHT_VAL=12000				            # 端口范围上边界
-HOST_IP="175.178.244.122"         # 云服公网IP
 
 # 时长等待配置 ###########################################################################################################
 
@@ -407,6 +408,7 @@ _displayWorldInfo(){
   _readConfig "${CLUSTER_NAME}"
 
   # 打印配置信息
+  HOST_IP=$(curl -s ipinfo.io | grep ip|awk -F\" 'NR==1{print $4}')         # 云服公网IP
   connectCMD="c_connect(\"${HOST_IP}\", ${master_port}, \"${cluster_password}\")"
   echo ""
   echo "======================== 当前存档：[ ${CLUSTER_NAME} ] =========================="
@@ -678,6 +680,9 @@ func_rollback(){
     MASTER_SCREEN_NAME="${CLUSTER_NAME}_Master"
     cmd="c_rollback(${COUNT})$(printf \\r)"
 
+    # 回档前输出世界信息回显
+    _displayWorldInfo "${CLUSTER_NAME}"
+
     # 回档前提示
     cmd_rollback_tips="c_announce(\"${ROLLBACK_MSG}\")$(printf \\r)"
     for i in {1..3};do
@@ -691,8 +696,6 @@ func_rollback(){
     screen -x -S "${MASTER_SCREEN_NAME}" -p 0 -X stuff "${cmd}"
     echo "存档 ${CLUSTER_NAME} 已回档，回档次数: ${COUNT} ！"
 
-    # 回档完毕，输出世界信息回显
-    _displayWorldInfo "${CLUSTER_NAME}"
   else
     echo "ERROR: ${CLUSTER_NAME} 未启动，无法回档！"
   fi
