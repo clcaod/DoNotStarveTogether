@@ -17,6 +17,15 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"      # 使用这�
 
 CLUSTER_PATH="$(cd ~/.klei/DoNotStarveTogether/ && pwd)"            # 饥荒默认存档目录，如果不正确需要修改
 
+LOCAL_SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"  # 本脚本所在目录
+
+# 自动更新功能的配置项
+CRONTAB_EXP="0 */3 * * *"                                  # 定时任务表达式 分 时 天 月 星期 ，当前含义：每隔3小时进行一次自动更新
+UPDATE_PATH="${LOCAL_SCRIPT_DIR}/updateDST"
+LOG_FILE="${UPDATE_PATH}/update.log"
+CLUSTER_LIST_FILE="${UPDATE_PATH}/clusterList.txt"
+STEAMCMD_PATH="$(cd ~/Steam/ && pwd)"                               # steamcmd安装的目录
+
 # 单服务器多开时，端口冲突分配的端口范围 #####################################################################################
 
 LEFT_VAL=10800				            # 端口范围下边界
@@ -65,206 +74,198 @@ _progress(){
   printf "\n"
 }
 
-# 完整的语法提示
-_usageTip(){
-    echo "Usage: "
-    echo "  bash $0 <command> <cluster_name> <option>"
-    echo ""
-    echo "  尝试 'bash dst.sh <start|stop|restart|status|send|-r|rollback|-h|--help> <cluster_name> [option]'"
-    echo "  尝试 'bash dst.sh -h 或者 bash dst.sh --help 查看更多信息"
-    echo ""
-    echo "Commands:"
-    echo "  start     启动世界，默认开始世界+洞穴，添加option可指定世界或者洞穴"
-    echo "            用法："
-    echo "                bash $0 start <cluster_name> [Master|Caves]"
-    echo "            举例："
-    echo "                bash dst.sh start Cluster_1         开启存档 Cluster_1 的主世界和洞穴"
-    echo "                bash dst.sh start Cluster_1 Master  仅开启存档 Cluster_1 的主世界"
-    echo ""
-    echo "  stop      停止世界，默认停止世界+洞穴，添加option可指定世界或者洞穴"
-    echo "            用法："
-    echo "                bash $0 stop <cluster_name> [Master|Caves]"
-    echo "            举例："
-    echo "                bash $0 stop Cluster_1              停止存档 Cluster_1 的主世界和洞穴"
-    echo "                bash $0 stop Cluster_1 Caves        仅停止存档 Cluster_1 的洞穴"
-    echo ""
-    echo "            注：饥荒关闭主世界默认洞穴会相应关闭，因此 bash $0 stop Cluster_1 等同 bash $0 stop Cluster_1 Master"
-    echo ""
-    echo "  restart   重启世界，默认重启世界+洞穴。"
-    echo "            用法："
-    echo "                bash $0 restart <cluster_name> "
-    echo "            举例："
-    echo "                bash $0 restart Cluster_1           重启开启存档 Cluster_1 的主世界和洞穴"
-    echo ""
-    echo "  status    查询存档（主世界）运行状态"
-    echo "            用法： "
-    echo "                bash $0 restart <cluster_name>"
-    echo "            举例："
-    echo "                bash $0 restart Cluster_1           重启开启存档 Cluster_1 的主世界和洞穴"
-    echo ""
-    echo "  send      给世界和洞穴发送消息通知"
-    echo "            用法："
-    echo "                bash $0 send <cluster_name> [message]"
-    echo "            举例："
-    echo "                bash $0 send Cluster_1  '新增Mod，服务器将在下午重启!'  "
-    echo ""
-    echo "  -r        regenerateWorld 重置世界"
-    echo "            用法： "
-    echo "                bash $0 -r <cluster_name>"
-    echo "            举例："
-    echo "                bash $0 -r Cluster_1                  重置存档 Cluster_1   "
-    echo ""
-    echo "  rollback  regenerateWorld 重置世界"
-    echo "            用法："
-    echo "                bash $0 rollback <cluster_name> [option]"
-    echo "            举例："
-    echo "                bash $0 rollback Cluster_1           回档 Cluster_1 默认 1 次 "
-    echo "                bash $0 rollback Cluster_1 3         回档 Cluster_1 指定 3 次 "
-    echo ""
-    echo "Cluster_name:"
-    echo "            存档名称，默认格式 Cluster_# ,#为数字1,2,...n"
-    echo "            存档存在时正常执行，存档不存在时候启动则会在默认目录创建存档目录"
-    echo ""
-    echo "Options:"
-    echo "  Master    需搭配命令 start|stop 使用，用于指定世界"
-    echo "  Caves     需搭配命令 start|stop 使用，用于指定洞穴"
-    echo "  Message   需搭配命令 send 使用，为字符串格式，给服务器发送的通知内容"
-    echo "  count     需搭配命令 rollback 使用，为数字格式，指定回档的次数"
-    exit 1
+# 简短的语法提示,为了提高代码复用性，将方法内exit命令移除，调用该方法后需要手动执行exit 1
+_simpleUsageTip(){
+  echo "Usage: "
+  echo "  bash $0 <command> <cluster_name> <option>"
+  echo ""
+  echo "  尝试 'bash dst.sh <start|stop|restart|status|send|-r|rollback|update|-h|--help> <cluster_name|enable|disable> [option]'"
+  echo "  尝试 'bash dst.sh -h 或者 bash dst.sh --help 查看更多信息"
 }
 
-# 简短的语法提示
-_simpleUsageTip(){
-      echo "Usage: "
-      echo "  bash $0 <command> <cluster_name> <option>"
-      echo ""
-      echo "  尝试 'bash dst.sh <start|stop|restart|status|send|-r|rollback|-h|--help> <cluster_name> [option]'"
-      echo "  尝试 'bash dst.sh -h 或者 bash dst.sh --help 查看更多信息"
-      exit 1
+# 完整的语法提示
+_usageTip(){
+  _simpleUsageTip
+  echo ""
+  echo "Commands:"
+  echo "  start     启动世界，默认开始世界+洞穴，添加option可指定世界或者洞穴"
+  echo "            用法："
+  echo "                bash $0 start <cluster_name> [Master|Caves]"
+  echo "            举例："
+  echo "                bash dst.sh start Cluster_1         开启存档 Cluster_1 的主世界和洞穴"
+  echo "                bash dst.sh start Cluster_1 Master  仅开启存档 Cluster_1 的主世界"
+  echo ""
+  echo "  stop      停止世界，默认停止世界+洞穴，添加option可指定世界或者洞穴"
+  echo "            用法："
+  echo "                bash $0 stop <cluster_name> [Master|Caves]"
+  echo "            举例："
+  echo "                bash $0 stop Cluster_1              停止存档 Cluster_1 的主世界和洞穴"
+  echo "                bash $0 stop Cluster_1 Caves        仅停止存档 Cluster_1 的洞穴"
+  echo ""
+  echo "            注：饥荒关闭主世界默认洞穴会相应关闭，因此 bash $0 stop Cluster_1 等同 bash $0 stop Cluster_1 Master"
+  echo ""
+  echo "  restart   重启世界，默认重启世界+洞穴。"
+  echo "            用法："
+  echo "                bash $0 restart <cluster_name> "
+  echo "            举例："
+  echo "                bash $0 restart Cluster_1           重启开启存档 Cluster_1 的主世界和洞穴"
+  echo ""
+  echo "  status    查询存档（主世界）运行状态"
+  echo "            用法： "
+  echo "                bash $0 restart <cluster_name>"
+  echo "            举例："
+  echo "                bash $0 restart Cluster_1           重启开启存档 Cluster_1 的主世界和洞穴"
+  echo ""
+  echo "  send      给世界和洞穴发送消息通知"
+  echo "            用法："
+  echo "                bash $0 send <cluster_name> [message]"
+  echo "            举例："
+  echo "                bash $0 send Cluster_1  '新增Mod，服务器将在下午重启!'  "
+  echo ""
+  echo "  -r        regenerateWorld 重置世界"
+  echo "            用法： "
+  echo "                bash $0 -r <cluster_name>"
+  echo "            举例："
+  echo "                bash $0 -r Cluster_1                  重置存档 Cluster_1   "
+  echo ""
+  echo "  rollback  世界回档"
+  echo "            用法："
+  echo "                bash $0 rollback <cluster_name> [option]"
+  echo "            举例："
+  echo "                bash $0 rollback Cluster_1           回档 Cluster_1 默认 1 次 "
+  echo "                bash $0 rollback Cluster_1 3         回档 Cluster_1 指定 3 次 "
+  echo ""
+  echo "  update    服务器更新,启用后之后启动的存档将会在更新后自动重启"
+  echo "            修改脚本配置区变量 'CRONTAB_EXP' 可配置定时更新时间"
+  echo "            用法："
+  echo "                bash $0 update <enable|disable>"
+  echo "            举例："
+  echo "                bash $0 update                       手动尝试执行更新 "
+  echo "                bash $0 update enable                启动自动更新 "
+  echo "                bash $0 update disable               关闭自动更新 "
+  echo ""
+  echo "Cluster_name:"
+  echo "            存档名称，默认格式 Cluster_# ,#为数字1,2,...n"
+  echo "            存档存在时正常执行，存档不存在时候启动则会在默认目录创建存档目录"
+  echo ""
+  echo "Options:"
+  echo "  Master    需搭配命令 start|stop 使用，用于指定世界"
+  echo "  Caves     需搭配命令 start|stop 使用，用于指定洞穴"
+  echo "  Message   需搭配命令 send 使用，为字符串格式，给服务器发送的通知内容"
+  echo "  count     需搭配命令 rollback 使用，为数字格式，指定回档的次数"
+  exit 1
 }
 
 # 开启世界功能语法提示
 _startUsageTip(){
-      echo "Usage: "
-      echo "  bash $0 <command> <cluster_name> <option>"
-      echo ""
-      echo "  尝试 'bash dst.sh <start|stop|restart|status|send|-r|rollback|-h|--help> <cluster_name> [option]'"
-      echo "  尝试 'bash dst.sh -h 或者 bash dst.sh --help 查看更多信息"
-      echo ""
-      echo "Commands:"
-      echo "  start     启动世界，默认开始世界+洞穴，添加option可指定世界或者洞穴"
-      echo "            用法："
-      echo "                bash $0 start <cluster_name> [Master|Caves]"
-      echo "            举例："
-      echo "                bash dst.sh start Cluster_1         开启存档 Cluster_1 的主世界和洞穴"
-      echo "                bash dst.sh start Cluster_1 Master  仅开启存档 Cluster_1 的主世界"
-      exit 1
+  _simpleUsageTip
+  echo ""
+  echo "Commands:"
+  echo "  start     启动世界，默认开始世界+洞穴，添加option可指定世界或者洞穴"
+  echo "            用法："
+  echo "                bash $0 start <cluster_name> [Master|Caves]"
+  echo "            举例："
+  echo "                bash dst.sh start Cluster_1         开启存档 Cluster_1 的主世界和洞穴"
+  echo "                bash dst.sh start Cluster_1 Master  仅开启存档 Cluster_1 的主世界"
+  exit 1
 }
 
 # 停止世界功能语法提示
 _stopUsageTip(){
-    echo "Usage: "
-    echo "  bash $0 <command> <cluster_name> <option>"
-    echo ""
-    echo "  尝试 'bash dst.sh <start|stop|restart|status|send|-r|rollback|-h|--help> <cluster_name> [option]'"
-    echo "  尝试 'bash dst.sh -h 或者 bash dst.sh --help 查看更多信息"
-    echo ""
-    echo "Commands:"
-    echo "  stop      停止世界，默认停止世界+洞穴，添加option可指定世界或者洞穴"
-    echo "            用法："
-    echo "                bash $0 stop <cluster_name> [Master|Caves]"
-    echo "            举例："
-    echo "                bash $0 stop Cluster_1              停止存档 Cluster_1 的主世界和洞穴"
-    echo "                bash $0 stop Cluster_1 Caves        仅停止存档 Cluster_1 的洞穴"
-    echo ""
-    echo "            注：饥荒关闭主世界默认洞穴会相应关闭，因此 bash $0 stop Cluster_1 等同 bash $0 stop Cluster_1 Master"
-    exit 1
+  _simpleUsageTip
+  echo ""
+  echo "Commands:"
+  echo "  stop      停止世界，默认停止世界+洞穴，添加option可指定世界或者洞穴"
+  echo "            用法："
+  echo "                bash $0 stop <cluster_name> [Master|Caves]"
+  echo "            举例："
+  echo "                bash $0 stop Cluster_1              停止存档 Cluster_1 的主世界和洞穴"
+  echo "                bash $0 stop Cluster_1 Caves        仅停止存档 Cluster_1 的洞穴"
+  echo ""
+  echo "            注：饥荒关闭主世界默认洞穴会相应关闭，因此 bash $0 stop Cluster_1 等同 bash $0 stop Cluster_1 Master"
+  exit 1
 }
 
 # 重启世界功能语法提示
 _restartUsageTip(){
-    echo "Usage: "
-    echo "  bash $0 <command> <cluster_name> <option>"
-    echo ""
-    echo "  尝试 'bash dst.sh <start|stop|restart|status|send|-r|rollback|-h|--help> <cluster_name> [option]'"
-    echo "  尝试 'bash dst.sh -h 或者 bash dst.sh --help 查看更多信息"
-    echo ""
-    echo "Commands:"
-    echo "  restart   重启世界，默认重启世界+洞穴。"
-    echo "            用法："
-    echo "                bash $0 restart <cluster_name> "
-    echo "            举例："
-    echo "                bash $0 restart Cluster_1           重启开启存档 Cluster_1 的主世界和洞穴"
-    exit 1
+  _simpleUsageTip
+  echo ""
+  echo "Commands:"
+  echo "  restart   重启世界，默认重启世界+洞穴。"
+  echo "            用法："
+  echo "                bash $0 restart <cluster_name> "
+  echo "            举例："
+  echo "                bash $0 restart Cluster_1           重启开启存档 Cluster_1 的主世界和洞穴"
+  exit 1
 }
 
 # 查询状态功能语法提示
 _statusUsageTip(){
-    echo "Usage: "
-    echo "  bash $0 <command> <cluster_name> <option>"
-    echo ""
-    echo "  尝试 'bash dst.sh <start|stop|restart|status|send|-r|rollback|-h|--help> <cluster_name> [option]'"
-    echo "  尝试 'bash dst.sh -h 或者 bash dst.sh --help 查看更多信息"
-    echo ""
-    echo "Commands:"
-    echo "  status    查询存档（主世界）运行状态"
-    echo "            用法： "
-    echo "                bash $0 restart <cluster_name>"
-    echo "            举例："
-    echo "                bash $0 restart Cluster_1           重启开启存档 Cluster_1 的主世界和洞穴"
-    exit 1
+  _simpleUsageTip
+  echo ""
+  echo "Commands:"
+  echo "  status    查询存档（主世界）运行状态"
+  echo "            用法： "
+  echo "                bash $0 restart <cluster_name>"
+  echo "            举例："
+  echo "                bash $0 restart Cluster_1           重启开启存档 Cluster_1 的主世界和洞穴"
+  exit 1
 }
 
 # 发送消息功能语法提示
 _sendUsageTip(){
-    echo "Usage: "
-    echo "  bash $0 <command> <cluster_name> <option>"
-    echo ""
-    echo "  尝试 'bash dst.sh <start|stop|restart|status|send|-r|rollback|-h|--help> <cluster_name> [option]'"
-    echo "  尝试 'bash dst.sh -h 或者 bash dst.sh --help 查看更多信息"
-    echo ""
-    echo "Commands:"
-    echo "  send      给世界和洞穴发送消息通知"
-    echo "            用法："
-    echo "                bash $0 send <cluster_name> [message]"
-    echo "            举例："
-    echo "                bash $0 send Cluster_1  '新增Mod，服务器将在下午重启!'  "
-    exit 1
+  _simpleUsageTip
+  echo ""
+  echo "Commands:"
+  echo "  send      给世界和洞穴发送消息通知"
+  echo "            用法："
+  echo "                bash $0 send <cluster_name> [message]"
+  echo "            举例："
+  echo "                bash $0 send Cluster_1  '新增Mod，服务器将在下午重启!'  "
+  exit 1
 }
 
 # 重置世界功能语法提示
 _regenerateWorldUsageTip(){
-    echo "Usage: "
-    echo "  bash $0 <command> <cluster_name> <option>"
-    echo ""
-    echo "  尝试 'bash dst.sh <start|stop|restart|status|send|-r|rollback|-h|--help> <cluster_name> [option]'"
-    echo "  尝试 'bash dst.sh -h 或者 bash dst.sh --help 查看更多信息"
-    echo ""
-    echo "Commands:"
-    echo "  -r        regenerateWorld 重置世界"
-    echo "            用法： "
-    echo "                bash $0 -r <cluster_name>"
-    echo "            举例："
-    echo "                bash $0 -r Cluster_1                  重置存档 Cluster_1   "
-    exit 1
+  _simpleUsageTip
+  echo ""
+  echo "Commands:"
+  echo "  -r        regenerateWorld 重置世界"
+  echo "            用法： "
+  echo "                bash $0 -r <cluster_name>"
+  echo "            举例："
+  echo "                bash $0 -r Cluster_1                  重置存档 Cluster_1   "
+  exit 1
 }
 
 # 回档功能语法提示
 _rollbackUsageTip(){
-    echo "Usage: "
-    echo "  bash $0 <command> <cluster_name> <option>"
-    echo ""
-    echo "  尝试 'bash dst.sh <start|stop|restart|status|send|-r|rollback|-h|--help> <cluster_name> [option]'"
-    echo "  尝试 'bash dst.sh -h 或者 bash dst.sh --help 查看更多信息"
-    echo ""
-    echo "Commands:"
-    echo "  rollback  regenerateWorld 重置世界"
-    echo "            用法："
-    echo "                bash $0 rollback <cluster_name> [option]"
-    echo "            举例："
-    echo "                bash $0 rollback Cluster_1           回档 Cluster_1 默认 1 次 "
-    echo "                bash $0 rollback Cluster_1 3         回档 Cluster_1 指定 3 次 "
-    exit 1
+  _simpleUsageTip
+  echo ""
+  echo "Commands:"
+  echo "  rollback  regenerateWorld 重置世界"
+  echo "            用法："
+  echo "                bash $0 rollback <cluster_name> [option]"
+  echo "            举例："
+  echo "                bash $0 rollback Cluster_1           回档 Cluster_1 默认 1 次 "
+  echo "                bash $0 rollback Cluster_1 3         回档 Cluster_1 指定 3 次 "
+  exit 1
+}
+
+# 更新功能语法提示
+_updateUsageTip(){
+  _simpleUsageTip
+  echo ""
+  echo "Commands:"
+  echo "  update    服务器更新,启用后之后启动的存档将会在更新后自动重启"
+  echo "            修改脚本配置区变量 'CRONTAB_EXP' 可配置定时更新时间"
+  echo "            用法："
+  echo "                bash $0 update <enable|disable>"
+  echo "            举例："
+  echo "                bash $0 update                       手动尝试执行更新 "
+  echo "                bash $0 update enable                启动自动更新 "
+  echo "                bash $0 update disable               关闭自动更新 "
+  exit 1
 }
 
 ####################################################
@@ -344,6 +345,16 @@ _screenMgr(){
   screen -x -S "${SCREEN_NAME}" -p 0 -X stuff $'\n'
 }
 
+# 校验文件是否存在，不存在则返回0，存在返回1
+_checkFile(){
+  file=$1
+  if [ -f "$file" ]; then
+    echo 1
+  else
+    echo 0
+  fi
+}
+
 ##################################################
 # 功能：读取存档的配置信息
 #
@@ -361,15 +372,38 @@ _readConfig(){
   master_ini="${CLUSTER_PATH}/${CLUSTER_NAME}/Master/server.ini"
   caves_ini="${CLUSTER_PATH}/${CLUSTER_NAME}/Caves/server.ini"
 
-  # 世界的基本信息
-  game_mode=$(_readINI "${cluster_ini}" "GAMEPLAY" "game_mode" |sed -e 's/^[ \t]*//g')
-  max_players=$(_readINI "${cluster_ini}" "GAMEPLAY" "max_players" |sed -e 's/^[ \t]*//g')
-  cluster_name=$(_readINI "${cluster_ini}" "NETWORK" "cluster_name" |sed -e 's/^[ \t]*//g')
-  cluster_description=$(_readINI "${cluster_ini}" "NETWORK" "cluster_description" |sed -e 's/^[ \t]*//g')
-  cluster_password=$(_readINI "${cluster_ini}" "NETWORK" "cluster_password" |sed -e 's/^[ \t]*//g')
-  server_port=$(_readINI "${cluster_ini}" "SHARD" "master_port" |sed -e 's/^[ \t]*//g')
-  master_port=$(_readINI "${master_ini}" "NETWORK" "server_port" |sed -e 's/^[ \t]*//g')
-  caves_port=$(_readINI "${caves_ini}" "NETWORK" "server_port" |sed -e 's/^[ \t]*//g')
+  # 读取服务器配置文件
+  if [ "$(_checkFile "${cluster_ini}")" == 0 ]; then
+    unset game_mode
+    unset max_players
+    unset cluster_name
+    unset cluster_description
+    unset cluster_password
+    unset server_port
+  else
+    game_mode=$(_readINI "${cluster_ini}" "GAMEPLAY" "game_mode" |sed -e 's/^[ \t]*//g')
+    max_players=$(_readINI "${cluster_ini}" "GAMEPLAY" "max_players" |sed -e 's/^[ \t]*//g')
+    cluster_name=$(_readINI "${cluster_ini}" "NETWORK" "cluster_name" |sed -e 's/^[ \t]*//g')
+    cluster_description=$(_readINI "${cluster_ini}" "NETWORK" "cluster_description" |sed -e 's/^[ \t]*//g')
+    cluster_password=$(_readINI "${cluster_ini}" "NETWORK" "cluster_password" |sed -e 's/^[ \t]*//g')
+    server_port=$(_readINI "${cluster_ini}" "SHARD" "master_port" |sed -e 's/^[ \t]*//g')
+  fi
+
+  # 读取世界配置文件
+  if [ "$(_checkFile "${master_ini}")" == 0 ]; then
+    unset master_port
+  else
+    master_port=$(_readINI "${master_ini}" "NETWORK" "server_port" |sed -e 's/^[ \t]*//g')
+  fi
+
+  # 读取洞穴配置文件
+  if [ "$(_checkFile "${caves_ini}")" == 0 ]; then
+    unset caves_port
+  else
+    caves_port=$(_readINI "${caves_ini}" "NETWORK" "server_port" |sed -e 's/^[ \t]*//g')
+  fi
+
+
 }
 
 ###################################################
@@ -426,6 +460,64 @@ _displayWorldInfo(){
   echo ""
 }
 
+# 列举目录,仅名称包含 Cluster 的目录会列举
+_listDir(){
+  DIR_PATH=$1
+  dir_list=$(ls -l "${DIR_PATH}"|awk '/^d/ {print $NF}'|grep Cluster)
+  echo "$dir_list"
+}
+
+# 格式化输出
+_printfStatus(){
+  # 位置参数
+  CLUSTER_NAME="$1"
+
+  # 是否开启自动更新功能
+  isEnable="已开启"
+  result=$(crontab -l 2>/dev/null| grep -c "$0")
+  if [ "${result}" == 0 ]; then
+    isEnable="未启动"
+    printf "自动更新功能: %s\n" "${isEnable}"
+  else
+    printf "自动更新功能: %s\n" "${isEnable}"
+    printf "更新日志: %s\n" "${LOG_FILE}"
+  fi
+
+  # 表头字段
+  title1="存档名称"
+  title2="游戏模式"
+  title3="最大人数"
+  title4="运行状态"
+  title5="更新自启动"
+  title6="世界名称"
+
+  # 打印表头
+  printf "%-10s\t %-10s\t %-10s\t %-10s\t %-10s\t %s\n" $title1 $title2 $title3 $title4 $title5 $title6
+  # 数据打印
+  cluster_arr=($(_listDir "${CLUSTER_PATH}"))
+  if [ -n "${CLUSTER_NAME}" ]; then
+      cluster_arr=(${CLUSTER_NAME})
+  fi
+  for dir in "${cluster_arr[@]}";do
+    _readConfig $dir
+
+    # 运行状态判断
+    status="未运行"
+    if [ "$(_checkPid "${dir}")" != "" ]; then
+      status="正在运行"
+    fi
+
+    # 更新自启动
+    autoStart="FALSE"
+    if [ -f "${CLUSTER_LIST_FILE}" ] && [ $(cat "${CLUSTER_LIST_FILE}" | grep -c "${dir}") != 0 ]; then
+      autoStart="TRUE"
+    fi
+
+    # 打印数据
+    printf "%-10s\t %-10s\t %-10s\t %-10s\t %-10s\t %s\n" "$dir" "$game_mode" "$max_players" "$status" "$autoStart" "$cluster_name"
+  done
+}
+
 # 启动服务
 func_start(){
     local CLUSTER_NAME=$1
@@ -461,13 +553,21 @@ func_start(){
 
         if [[ $? -ne 0 ]];then
           echo "${CLUSTER_NAME} 启动失败!"
+          echo ""
+          echo "  尝试  bash dst.sh status 可查看所有存档状态信息"
         else
+          # 启动世界追加到更新自动重启列表中
+          if [ -f "${CLUSTER_LIST_FILE}" ] && [ "$(grep -wc "${CLUSTER_NAME}" < "${CLUSTER_LIST_FILE}")" == 0 ]; then
+              echo "${CLUSTER_NAME}" >> "${CLUSTER_LIST_FILE}"
+          fi
+
           echo "${CLUSTER_NAME} 启动成功!"
-        screen -ls
+          echo ""
+          echo "使用命令: bash $0 status 可查看所有存档状态信息"
         fi
       else
-        echo "ERROR: ${CLUSTER_NAME} 已启动 [PID:${pid}]，本次启动失败！"
-        screen -ls
+        echo "ERROR: ${CLUSTER_NAME} 已启动，请勿重复启动！"
+        echo "使用命令: bash $0 status 可查看所有存档状态信息"
         echo "----------------------------------------------------------------------------"
         exit 1
       fi
@@ -488,14 +588,20 @@ func_start(){
 
         if [[ $? -ne 0 ]];then
           echo "${SCREEN_NAME} 启动失败!"
+          echo "  尝试  bash dst.sh status 可查看所有存档状态信息"
         else
           echo "${SCREEN_NAME} 启动成功!"
-        screen -ls
+          # 启动世界追加到更新自动重启列表中
+          if [ -f "${CLUSTER_LIST_FILE}" ] && [ "$(grep -wc "${CLUSTER_NAME}" < "${CLUSTER_LIST_FILE}")" == 0 ]; then
+              echo "${CLUSTER_NAME}" >> "${CLUSTER_LIST_FILE}"
+          fi
+          echo ""
+          echo "  尝试  bash dst.sh status 可查看所有存档状态信息"
         fi
 
       else
-        echo "ERROR: ${SCREEN_NAME} 已启动 [PID:${pid}]，本次启动失败！"
-        screen -ls
+        echo "ERROR: ${SCREEN_NAME} 已启动，请勿重复启动！"
+        echo "使用命令: bash $0 status 可查看所有存档状态信息"
         echo "----------------------------------------------------------------------------"
         exit 1
       fi
@@ -528,23 +634,30 @@ func_stop(){
           done
 
           # 倒计时回显提示
-          echo "窗口：${screen_name} 服务即将关闭...预计${TIME_STOP_TIP}秒"
+          echo "窗口：${screen_name} "
+          echo "服务即将关闭...预计${TIME_STOP_TIP}秒"
           _progress ${TIME_STOP_TIP}
-
+          echo "服务关闭成功!"
           # 倒计时给服务器发送关闭命令
           screen -x -S "${screen_name}" -p 0 -X stuff "${cmd_close}"
 
           # 最后退出screen窗口
-          echo "服务关闭成功，等待窗口退出...预计${TIME_EXIT_SCREEN}秒"
+          echo "等待窗口退出...预计${TIME_EXIT_SCREEN}秒"
           _progress ${TIME_EXIT_SCREEN}
 
           screen -x -S "${screen_name}" -p 0 -X stuff "${cmd_exit}"
           echo "窗口退出完毕。"
-          screen -ls
+
         else
           echo "WARMING:窗口：${screen_name} 未运行，无需再次关闭！"
         fi
       done
+      # 移除更新自动启动列表
+      sed -i s/"${CLUSTER_NAME}"//g "${CLUSTER_LIST_FILE}"
+
+      echo ""
+      echo "使用命令: bash $0 status 可查看所有存档状态信息"
+
     # 指定关闭主世界或者洞穴
     else
       local SCREEN_NAME="${CLUSTER_NAME}_${OPTION}"
@@ -563,20 +676,26 @@ func_stop(){
         done
 
         # 倒计时回显提示
-        echo "窗口：${screen_name} 服务即将关闭...预计${TIME_STOP_TIP}秒"
+        echo "窗口：${screen_name} "
+        echo "服务即将关闭...预计${TIME_STOP_TIP}秒"
         _progress ${TIME_STOP_TIP}
 
         # 倒计时给服务器发送关闭命令
         screen -x -S "${SCREEN_NAME}" -p 0 -X stuff "${cmd_close}"
 
         # 最后退出screen窗口
-        echo "服务关闭成功，等待窗口退出...预计${TIME_EXIT_SCREEN}秒"
+        echo "服务关闭成功!"
+        echo "等待窗口退出...预计${TIME_EXIT_SCREEN}秒"
         _progress ${TIME_EXIT_SCREEN}
 
         screen -x -S "${SCREEN_NAME}" -p 0 -X stuff "${cmd_exit}"
-        screen -ls
+        echo "窗口退出完毕。"
+        echo ""
+        echo "使用命令: bash $0 status 可查看所有存档状态信息"
       else
         echo "WARMING:窗口：${SCREEN_NAME} 未运行，无需再次关闭！"
+        echo ""
+        echo "使用命令: bash $0 status 可查看所有存档状态信息"
       fi
     fi
 }
@@ -592,12 +711,11 @@ func_restart(){
 func_status(){
     app_name=$1
 
-    if [[ $(_checkPid "${app_name}") != "" ]] ;then
-      echo ""
-	    echo "${app_name} 正在运行. "
-	    _displayWorldInfo "${app_name}"
+    # 不传参则查询所有已有存档状态信息
+    if [[ -z "${app_name}" ]]; then
+      _printfStatus
     else
-	    echo "${app_name} 未运行."
+      _printfStatus $app_name
     fi
 }
 
@@ -651,8 +769,12 @@ func_regenerateWorld(){
       cmd="c_regenerateworld()$(printf \\r)"
       screen -x -S "${MASTER_SCREEN_NAME}" -p 0 -X stuff "${cmd}"
       echo "存档 ${CLUSTER_NAME} 已重置！"
+      echo ""
+      echo "使用命令: bash $0 status 可查看所有存档状态信息"
     else
       echo "ERROR: ${CLUSTER_NAME} 未启动，无法重置！"
+      echo ""
+      echo "使用命令: bash $0 status 可查看所有存档状态信息"
     fi
       ;;
     [nN][oO]|[nN])
@@ -670,6 +792,12 @@ func_regenerateWorld(){
 func_rollback(){
   CLUSTER_NAME=$1
   COUNT=${OPTION}
+
+  # 校验是否为数字
+  if [ -z "$(echo "${COUNT}"|sed -n '/[0-9][0-9]*$/p')" ]; then
+    echo "ERROR: 回档次数需要为数字!"
+    _rollbackUsageTip
+  fi
 
   if [ -z "${COUNT}" ]; then
       COUNT=1
@@ -690,16 +818,122 @@ func_rollback(){
     done
 
     # 回档进度条
-    echo "服务期即将回档...预计${TIME_ROLLBACK_TIP}秒"
+    echo "服务器即将回档...预计${TIME_ROLLBACK_TIP}秒"
     _progress ${TIME_ROLLBACK_TIP}
 
     screen -x -S "${MASTER_SCREEN_NAME}" -p 0 -X stuff "${cmd}"
     echo "存档 ${CLUSTER_NAME} 已回档，回档次数: ${COUNT} ！"
 
+    echo ""
+    echo "使用命令: bash $0 status 可查看所有存档状态信息"
+
   else
     echo "ERROR: ${CLUSTER_NAME} 未启动，无法回档！"
+
+    echo ""
+    echo "使用命令: bash $0 status 可查看所有存档状态信息"
   fi
 }
+
+# 自动更新
+func_update(){
+  # update 命令的位置参数特殊，第二个参数 CLUSTER_NAME 实际为状态选项 enable|disable
+  STATUS=${CLUSTER_NAME}
+
+  # 如果STATUS为空则执行后面的更细，如果带参数则增加｜删除定时任务
+  if [ -z "${STATUS}" ]; then
+    # 函数没有位置参数时执行更新
+    if [ ! -d "$UPDATE_PATH" ]; then
+      mkdir "$UPDATE_PATH"
+    fi
+
+    CLUSTER_LIST_ARRAY=($(cat "${CLUSTER_LIST_FILE}"))
+
+    # 不带参数则直接执行更新命令
+    lastTime_version=$(cat "${SCRIPT_DIR}"/../version.txt)
+    "${STEAMCMD_PATH}"/steamcmd.sh +force_install_dir "${SCRIPT_DIR}"/../ +login anonymous +app_update 343050 +quit
+    current_version=$(cat "${SCRIPT_DIR}"/../version.txt)
+
+    # 检测到有更新则对设置好的存档进行重启
+    if [[ "${lastTime_version}" != "${current_version}"  ]];then
+      for APP_NAME in "${CLUSTER_LIST_ARRAY[@]}" ;do
+        bash "$0" restart "${APP_NAME}"
+        echo "[ $(date '+%Y-%m-%d %H:%M:%S') ] 检测到版本更新，存档 ${APP_NAME} 已重启，旧版本号：${lastTime_version}  新版本号：${current_version}" >> "${LOG_FILE}"
+      done
+      echo "检测到新版本，版本更新。查看更新日志命令: cat ${LOG_FILE}"
+    else
+      echo "版本已是最新版本！"
+    fi
+  else
+    cronStr="${CRONTAB_EXP} bash ${LOCAL_SCRIPT_DIR}/$0 update"
+
+    # 存在参数执行自动更细开关设置
+    if [ enable == "${STATUS}" ]; then
+      # 开启自动更新增加重启列表
+      touch "${CLUSTER_LIST_FILE}"
+      touch "${LOG_FILE}"
+      # 写入定时任务
+      # 如果已存在定时任务不再重复添加
+      result=$(crontab -l 2>/dev/null | grep "$0")
+      if [ "${result}" == "" ]; then
+        # 读取已存在的定时任务数量
+        cron_count=$(crontab -l 2>/dev/null | wc -l)
+        if [ "${cron_count}" != 0 ]; then
+          crontab -l > conf && echo "${cronStr}" >> conf && crontab conf && rm -f conf
+        else
+          echo "${cronStr}" >> conf && crontab conf && rm -f conf
+        fi
+
+        # 执行完显示配置的定时任务
+        echo "自动更新启动成功！修改自动更新频次请修改本脚本配置区：CRONTAB_EXP=\"${CRONTAB_EXP}\""
+        echo ""
+        echo "使用命令: bash $0 status 可查看所有存档状态信息"
+      else
+        echo "ERROR：自动更新功能已启动，请勿重复启动！"
+        echo ""
+        echo "使用命令: bash $0 status 可查看所有存档状态信息"
+        exit 1
+      fi
+    elif [ disable == "${STATUS}" ];then
+      # 移除文件
+      rm -f "${CLUSTER_LIST_FILE}"
+      # 无任务则直接退出
+      if [ "$(crontab -l | grep -c "$0")" == 0 ]; then
+          echo "ERROR:自动更新功能未启动,请勿重复关闭！"
+          echo ""
+          echo "使用命令: bash $0 status 可查看所有存档状态信息"
+          exit 1
+      fi
+      # 关闭定时任务,如果除了本脚本无其他定时任务则清空，如果有则导出再过滤
+      dst_cron_count=$(crontab -l | grep -vc "$0")
+      if [ "${dst_cron_count}" == 0 ]; then
+        crontab -r
+      else
+        crontab -l | grep -v "$0" >> conf && crontab conf && rm -f conf
+      fi
+
+      # 执行完显示配置的定时任务
+      echo "SUCCESS:自动更新已关闭!"
+      echo ""
+      echo "使用命令: bash $0 status 可查看所有存档状态信息"
+    else
+      # 其他情况给出提示
+      _updateUsageTip
+    fi
+  fi
+}
+
+# 脚本目录判断
+result=$(ls "${SCRIPT_DIR}"|grep -c "dontstarve_dedicated_server")
+if [ "${result}" == 0 ]; then
+  echo "ERROR:脚本目录不正确!"
+  echo "  尝试 方式一: 本脚本必须在指定目录下（默认方式）"
+  echo "             将脚本 $0 放置在饥荒目录的 bin 或者 bin64 目录下，确保与启动文件 dontstarve_dedicated_server_nullrenderer 同级"
+  echo ""
+  echo "      方式二: 本脚本可放置任何目录下"
+  echo "             将本脚本配置区变量 'SCRIPT_DIR=\"$(cd ~/dstserver/bin64/ && pwd)\"' 修改为饥荒启动文件正确路径并去掉前面的注释字符 '#'"
+  exit 1
+fi
 
 # 参数-h或者--help给出完整语法提示
 if [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
@@ -709,12 +943,14 @@ fi
 # 没有位置参数给出简短语法提示
 if [[ $# == 0 ]];then
   _simpleUsageTip
+  exit 1
 fi
 
 # 存档目录不存在提示
-if [[ -n ${CLUSTER_NAME} ]] && [[ ! -d "${CLUSTER_PATH}/${CLUSTER_NAME}" ]];then
+if [[ update != ${COMMAND} ]] && [[ -n ${CLUSTER_NAME} ]] && [[ ! -d "${CLUSTER_PATH}/${CLUSTER_NAME}" ]];then
   echo "ERROR: ${CLUSTER_NAME} 存档目录不存在！"
   _simpleUsageTip
+  exit 1
 fi
 
 #### 命令判断  ####
@@ -754,10 +990,10 @@ case "${COMMAND}" in
 	'status')
 	  # status 后面参数错误提示
 	  if [[ -z "${CLUSTER_NAME}" ]];then
-	    _statusUsageTip
+	    func_status
+	  else
+	    func_status "${CLUSTER_NAME}"
 	  fi
-
-		func_status "${CLUSTER_NAME}"
 		;;
   'send')
   	# send 命令必须携带消息，否则给出提示
@@ -781,6 +1017,16 @@ case "${COMMAND}" in
 	  fi
 
   	func_rollback "${CLUSTER_NAME}"
+  	;;
+  'update')
+	  # 没有位置参数意味着手动更新
+	  if [[ -z "${CLUSTER_NAME}" ]];then
+	    func_update
+	    exit 0
+	  fi
+
+	  # 存在位置参数为自动更新的开关设置
+	  func_update "${CLUSTER_NAME}"
   	;;
 	*)
 		_simpleUsageTip
