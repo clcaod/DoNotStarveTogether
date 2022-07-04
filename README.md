@@ -3,6 +3,9 @@ Don't Starve Together 饥荒联机版管理脚本
 
 对云服存档开服的一些基本管理，旨在简化云服管理操作，降低管理成本。
 
+<img width="1399" alt="截屏2022-07-04 16 56 20" src="https://user-images.githubusercontent.com/108561101/177120331-b6d2a335-5603-4958-8b09-b8f711041bc3.png">
+
+
 ## 一、功能
 当前支持功能项：
 
