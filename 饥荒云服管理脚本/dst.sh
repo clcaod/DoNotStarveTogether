@@ -761,7 +761,7 @@ func_regenerateWorld(){
         screen -x -S "${MASTER_SCREEN_NAME}" -p 0 -X stuff "${cmd_rollback_tips}"
       done
 
-      # 回档倒计时
+      # 重置倒计时
       echo "服务器即将重置...预计${TIME_REGENERATE_WORLD_TIP}秒"
       _progress ${TIME_REGENERATE_WORLD_TIP}
 
@@ -794,7 +794,7 @@ func_rollback(){
   COUNT=${OPTION}
 
   # 校验是否为数字
-  if [ -z "$(echo "${COUNT}"|sed -n '/[0-9][0-9]*$/p')" ]; then
+  if [ -n "${COUNT}" ] && [ -z "$(echo "${COUNT}"|sed -n '/[0-9][0-9]*$/p')" ]; then
     echo "ERROR: 回档次数需要为数字!"
     _rollbackUsageTip
   fi
