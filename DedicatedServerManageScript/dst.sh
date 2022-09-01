@@ -582,7 +582,7 @@ func_start(){
       local CAVES_SCREEN_NAME="${CLUSTER_NAME}_Caves"
 
       # 查看是否存在存档名的窗口，只有不存在情况下才启动
-      if [[ $(_checkPid "${CLUSTER_NAME}") == "" ]]; then
+      if [[ $(_checkPid "${CLUSTER_NAME}_Master") == "" ]]; then
         # 1.检查端口占用情况并重新分配端口写入配置文件
         _distributePort "${CLUSTER_NAME}"
 
