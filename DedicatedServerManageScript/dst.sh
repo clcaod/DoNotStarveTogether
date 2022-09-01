@@ -1006,12 +1006,20 @@ func_robot(){
     exit 1
   fi
 
+  # 读取配置信息
+  _readConfig "${CLUSTER_NAME}"
+
+  # 打印配置信息
+  HOST_IP=$(curl -s ipinfo.io | grep ip|awk -F\" 'NR==1{print $4}')         # 云服公网IP
+  connectCMD="c_connect(\"${HOST_IP}\", ${master_port}, \"${cluster_password}\")"
+
   # 游戏公告
   time=$(date '+%Y-%m-%d %H:%M:%S')
   echo "存档 ${CLUSTER_NAME} 已开启自查服务。"
   echo "发送游戏公告..."
   func_sendMsg "${CLUSTER_NAME}" "当前时间:${time}"
   func_sendMsg "${CLUSTER_NAME}" "本房间已开启自查服务(测试阶段)，输入「@时间」「@XX天气」获取对应信息。"
+  func_sendMsg "${CLUSTER_NAME}" "房间直连命令: ${connectCMD}"
   echo "等待玩家自查..."
 
   # 文件md5状态记录
