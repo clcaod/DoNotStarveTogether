@@ -26,6 +26,9 @@ LOG_FILE="${UPDATE_PATH}/update.log"
 CLUSTER_LIST_FILE="${UPDATE_PATH}/clusterList.txt"
 STEAMCMD_PATH="$(cd ~/Steam/ && pwd)"                               # steamcmd安装的目录
 
+# 游戏内互动功能
+ROBOT_LOG_FILE="${UPDATE_PATH}/robot.log"
+
 # 单服务器多开时，端口冲突分配的端口范围 #####################################################################################
 
 LEFT_VAL=10800				            # 端口范围下边界
@@ -79,7 +82,7 @@ _simpleUsageTip(){
   echo "Usage: "
   echo "  bash $0 <command> <cluster_name> <option>"
   echo ""
-  echo "  尝试 'bash dst.sh <start|stop|restart|status|send|-r|rollback|update|-h|--help> <cluster_name|enable|disable> [option]'"
+  echo "  尝试 'bash dst.sh <start|stop|restart|status|send|ban｜-r|rollback|robot|update|-h|--help> <cluster_name|enable|disable> [option]'"
   echo "  尝试 'bash dst.sh -h 或者 bash dst.sh --help 查看更多信息"
 }
 
@@ -122,6 +125,12 @@ _usageTip(){
   echo "            举例："
   echo "                bash $0 send Cluster_1  '新增Mod，服务器将在下午重启!'  "
   echo ""
+  echo "  ban      让世界封禁一个玩家"
+  echo "            用法："
+  echo "                bash $0 ban <cluster_name> [player_name]"
+  echo "            举例："
+  echo "                bash $0 ban Cluster_1  'KU_zePBhE0b'  "
+  echo ""
   echo "  -r        regenerateWorld 重置世界"
   echo "            用法： "
   echo "                bash $0 -r <cluster_name>"
@@ -149,10 +158,11 @@ _usageTip(){
   echo "            存档存在时正常执行，存档不存在时候启动则会在默认目录创建存档目录"
   echo ""
   echo "Options:"
-  echo "  Master    需搭配命令 start|stop 使用，用于指定世界"
-  echo "  Caves     需搭配命令 start|stop 使用，用于指定洞穴"
-  echo "  Message   需搭配命令 send 使用，为字符串格式，给服务器发送的通知内容"
-  echo "  count     需搭配命令 rollback 使用，为数字格式，指定回档的次数"
+  echo "  Master      需搭配命令 start|stop 使用，用于指定世界"
+  echo "  Caves       需搭配命令 start|stop 使用，用于指定洞穴"
+  echo "  Message     需搭配命令 send 使用，为字符串格式，给服务器发送的通知内容"
+  echo "  count       需搭配命令 rollback 使用，为数字格式，指定回档的次数"
+  echo "  player_name 需搭配命令 ban 使用，对该玩家进行封禁"
   exit 1
 }
 
@@ -225,6 +235,19 @@ _sendUsageTip(){
   exit 1
 }
 
+# 发送消息功能语法提示
+_banUsageTip(){
+  _simpleUsageTip
+  echo ""
+  echo "Commands:"
+  echo "  ban      让世界封禁一个玩家"
+  echo "            用法："
+  echo "                bash $0 ban <cluster_name> [player_name]"
+  echo "            举例："
+  echo "                bash $0 ban Cluster_1  'KU_zePBhE0b'  "
+  exit 1
+}
+
 # 重置世界功能语法提示
 _regenerateWorldUsageTip(){
   _simpleUsageTip
@@ -243,12 +266,26 @@ _rollbackUsageTip(){
   _simpleUsageTip
   echo ""
   echo "Commands:"
-  echo "  rollback  regenerateWorld 重置世界"
+  echo "  rollback  世界回档"
   echo "            用法："
   echo "                bash $0 rollback <cluster_name> [option]"
   echo "            举例："
   echo "                bash $0 rollback Cluster_1           回档 Cluster_1 默认 1 次 "
   echo "                bash $0 rollback Cluster_1 3         回档 Cluster_1 指定 3 次 "
+  exit 1
+}
+
+# 游戏内自回复提示
+_robotUsageTip(){
+  _simpleUsageTip
+  echo ""
+  echo "Commands:"
+  echo "  robot     对存档开启自查询功能"
+  echo "            用法："
+  echo "                bash $0 robot <cluster_name> "
+  echo "            举例："
+  echo "                bash $0 robot Cluster_1           对 Cluster_1 存档开启自查功能"
+  echo "                建议使用 nohup bash $0 robot Cluster_1 & 此命令可将服务挂在后台使用"
   exit 1
 }
 
@@ -465,6 +502,13 @@ _listDir(){
   DIR_PATH=$1
   dir_list=$(ls -l "${DIR_PATH}"|awk '/^d/ {print $NF}'|grep Cluster)
   echo "$dir_list"
+}
+
+# 日志打印格式化
+_printLog(){
+  content=$1
+  log_file=$2
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')]: ${content}" >> ${log_file}
 }
 
 # 格式化输出
@@ -722,7 +766,7 @@ func_status(){
 # 发送消息
 func_sendMsg(){
   CLUSTER_NAME=$1
-  MSG="${OPTION}"
+  MSG=$2
 
   # 只有主世界存在才会发送消息（不支持仅给洞穴发送消息）
   if [[ $(_checkPid "${CLUSTER_NAME}") != "" ]]; then
@@ -737,6 +781,24 @@ func_sendMsg(){
   else
     echo "ERROR: ${CLUSTER_NAME} 未启动，消息发送失败！"
   fi
+}
+
+# 禁止玩家
+func_ban(){
+    CLUSTER_NAME=$1
+    PLAYER_NAME="${OPTION}"
+
+    # 只有主世界存在才会发送消息（不支持仅给洞穴发送消息）
+    if [[ $(_checkPid "${CLUSTER_NAME}") != "" ]]; then
+
+      MASTER_SCREEN_NAME="${CLUSTER_NAME}_Master"
+      cmd="TheNet:Ban(\"${PLAYER_NAME}\")$(printf \\r)"
+
+      screen -x -S "${MASTER_SCREEN_NAME}" -p 0 -X stuff "${cmd}"
+      echo "玩家 ${PLAYER_NAME} 已被禁止加入游戏！"
+    else
+      echo "ERROR: ${CLUSTER_NAME} 未启动，消息发送失败！"
+    fi
 }
 
 # 重置世界
@@ -793,14 +855,14 @@ func_rollback(){
   CLUSTER_NAME=$1
   COUNT=${OPTION}
 
+  if [ -z "${COUNT}" ]; then
+    COUNT=1
+  fi
+
   # 校验是否为数字
   if [ -n "${COUNT}" ] && [ -z "$(echo "${COUNT}"|sed -n '/[0-9][0-9]*$/p')" ]; then
     echo "ERROR: 回档次数需要为数字!"
     _rollbackUsageTip
-  fi
-
-  if [ -z "${COUNT}" ]; then
-      COUNT=1
   fi
 
   # 只有主世界存在才能重置世界
@@ -822,7 +884,7 @@ func_rollback(){
     _progress ${TIME_ROLLBACK_TIP}
 
     screen -x -S "${MASTER_SCREEN_NAME}" -p 0 -X stuff "${cmd}"
-    echo "存档 ${CLUSTER_NAME} 已回档，回档次数: ${COUNT} ！"
+    echo "存档 ${CLUSTER_NAME} 已回档，回档次数: ${COUNT} "
 
     echo ""
     echo "使用命令: bash $0 status 可查看所有存档状态信息"
@@ -923,6 +985,89 @@ func_update(){
   fi
 }
 
+# 游戏内聊天互动
+func_robot(){
+  # 存档目录
+  CLUSTER_NAME=$1
+  # 聊天文件
+  chat_file="${CLUSTER_PATH}/${CLUSTER_NAME}/Master/server_chat_log.txt"
+
+  # 聊天文件判断
+  if [ ! -f "${chat_file}" ];then
+    echo "文件不存在:${chat_file}"
+    exit 1
+  fi
+
+  # 文件md5状态记录
+  preview_md5="$(find "${chat_file}"|xargs md5sum |awk '{print $1}')"
+  current_md5=""
+  time=$(date '+%Y-%m-%d %H:%M:%S')
+
+  # 游戏公告
+  func_sendMsg "${CLUSTER_NAME}" "当前时间:${time}"
+  func_sendMsg "${CLUSTER_NAME}" "本房间已开启自查服务(测试阶段)，输入「@时间」「@XX天气」获取对应信息。"
+
+  while true;do
+    # 根据文件的md5值判断文件是否有进行修改
+    current_md5="$(find "${chat_file}"|xargs md5sum |awk '{print $1}')"
+    if [[ "${current_md5}" != "${preview_md5}" ]];then
+      content=$(tail -1 "${chat_file}" | awk -F@ '{print $2}' |sed 's/[[:space:]]//g')
+
+      # 功能1：查询时间
+      if [[  "${content}" =~ "时间"  ]];then
+        time=$(date '+%Y-%m-%d %H:%M:%S')
+        feed_back="当前时间:${time}"
+        func_sendMsg "${CLUSTER_NAME}" "${feed_back}"
+        _printLog "检测到存档 ${CLUSTER_NAME} 互动 「@查询时间」,回馈内容:${feed_back}" "${ROBOT_LOG_FILE}"
+      fi
+      preview_md5=${current_md5}
+
+      # 功能2：查询天气
+      if [[ "$content" =~ "天气" ]];then
+        # 查询天气的URL前缀
+        url_pre="http://www.weather.com.cn/data/cityinfo"
+
+        city_name=${content//天气/}
+        # 根据列表文件获取cityId
+        cityId=$(grep "=${city_name}$" cityList.txt |awk -F= '{print $1}')
+        _printLog "检测到存档 ${CLUSTER_NAME} 互动 「@查询天气」, 读取城市名:${city_name}, 城市ID:${cityId}" "${ROBOT_LOG_FILE}"
+
+        if [ -z "${cityId}"  ];then
+          feed_back="未匹配到当前城市的ID呢"
+          func_sendMsg "${CLUSTER_NAME}" "${feed_back}"
+          _printLog "查询城市失败，回馈内容:${feed_back}" "${ROBOT_LOG_FILE}"
+        else
+          # 完整的url
+          url="${url_pre}/${cityId}.html"
+
+          # 获取json格式内容
+          # {"weatherinfo":{"city":"深圳","cityid":"101280601","temp1":"24℃","temp2":"30℃","weather":"阵雨转大雨","img1":"n3.gif","img2":"d9.gif","ptime":"18:00"}}
+          weather_json=$(curl "${url}")
+
+          _printLog "请求网址 「${url}」返回的 json 数据 「${weather_json}」" "${ROBOT_LOG_FILE}"
+
+          # 解析
+          temp1=$(echo "${weather_json}" |sed 's/,/\n/g' | grep temp1 |sed 's/"//g'|awk -F: '{print $2}')
+          temp2=$(echo "${weather_json}" |sed 's/,/\n/g' | grep temp2 |sed 's/"//g'|awk -F: '{print $2}')
+          weather=$(echo "${weather_json}" |sed 's/,/\n/g' | grep '"weather"' |sed 's/"//g'|awk -F: '{print $2}')
+
+          _printLog "解析json数据: temp1=${temp1}, temp2=${temp2}, weather=${weather}" "${ROBOT_LOG_FILE}"
+          # 给服务器发送消息
+          if [ -n "${temp1}" ] && [ -n "${temp2}" ] && [ -n "${weather}" ]; then
+            feed_back="${city_name}今天${weather},最低温度${temp1},最高温度${temp2}"
+            func_sendMsg "${CLUSTER_NAME}" "${feed_back}"
+            _printLog "查询${content}成功,返回内容:${feed_back}" "${ROBOT_LOG_FILE}"
+          else
+            feed_back="未匹配到当前城市的ID呢"
+            _printLog "解析json数据存在空值，反馈内容:${feed_back}" "${ROBOT_LOG_FILE}"
+          fi
+        fi
+      fi
+
+    fi
+  done
+}
+
 # 脚本目录判断
 result=$(ls "${SCRIPT_DIR}"|grep -c "dontstarve_dedicated_server")
 if [ "${result}" == 0 ]; then
@@ -1000,8 +1145,15 @@ case "${COMMAND}" in
 	  if [[ -z "${CLUSTER_NAME}" ]] || [[ -z "${OPTION}" ]]; then
 	    _sendUsageTip
 	  fi
-  	func_sendMsg "${CLUSTER_NAME}"
+  	func_sendMsg "${CLUSTER_NAME}" "${OPTION}"
   	;;
+   'ban')
+   	# ban 命令必须携带禁止玩家的ID
+ 	  if [[ -z "${CLUSTER_NAME}" ]] || [[ -z "${OPTION}" ]]; then
+ 	    _banUsageTip
+ 	  fi
+   	func_ban "${CLUSTER_NAME}"
+   	;;
   '-r')
 	  # -r 后面参数错误提示
 	  if [[ -z "${CLUSTER_NAME}" ]];then
@@ -1027,6 +1179,14 @@ case "${COMMAND}" in
 
 	  # 存在位置参数为自动更新的开关设置
 	  func_update "${CLUSTER_NAME}"
+  	;;
+  'robot')
+	  # robot 后面参数错误提示
+	  if [[ -z "${CLUSTER_NAME}" ]];then
+	    _robotUsageTip
+	  fi
+
+  	func_robot "${CLUSTER_NAME}"
   	;;
 	*)
 		_simpleUsageTip
