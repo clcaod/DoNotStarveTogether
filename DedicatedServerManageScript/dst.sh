@@ -561,7 +561,7 @@ _printfStatus(){
 
     # 自查功能是否启动
     isRobotEnable="未启动"
-    if [ "$(_checkPid "${dir}_ROBOT")" != "" ]; then
+    if [[ "$(_checkPid "${dir}_ROBOT")" != "" ]]; then
       isRobotEnable="已启动"
     fi
 
@@ -1093,8 +1093,8 @@ func_robotSwitch(){
   ROBOT_SCREEN_NAME="${CLUSTER_NAME}_ROBOT"
 
   # OPTION为 enable|disable 其他则给出错误提示
-  if [ $(_checkPid "${CLUSTER_NAME}") != "" ]; then
-    # 开启后台自查功能
+  if [[ $(_checkPid "${CLUSTER_NAME}") != "" ]]; then
+    # 启后台自查功能
     if [ "${OPTION}" == "enable" ]; then
       # 开启守护窗口
       screen -dmS "${ROBOT_SCREEN_NAME}"
@@ -1108,7 +1108,7 @@ func_robotSwitch(){
     # 关闭后台自查功能
     elif [ "${OPTION}" == "disable" ];then
       # 只有开启了才能正确关闭
-      if [ $(_checkPid "${ROBOT_SCREEN_NAME}") != ""  ]; then
+      if [[ $(_checkPid "${ROBOT_SCREEN_NAME}") != ""  ]]; then
         # 退出窗口命令
         cmd_exit="exit$(printf \\r)"
         screen -x -S "${ROBOT_SCREEN_NAME}" -p 0 -X stuff "${cmd_exit}"
