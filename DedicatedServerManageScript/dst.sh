@@ -7,6 +7,8 @@
 #
 # GitHub链接：https://github.com/clcaod/DoNotStarveTogether.git
 #
+# Linux后台下载命令： wget https://raw.githubusercontent.com/clcaod/DoNotStarveTogether/main/DedicatedServerManageScript/dst.sh
+#
 
 #-------------------------------------------配置区----------------------------------------------------------------------#
 
@@ -1098,7 +1100,7 @@ func_robotSwitch(){
     if [ "${OPTION}" == "enable" ]; then
       # 开启守护窗口
       screen -dmS "${ROBOT_SCREEN_NAME}"
-      cmd="bash $0 robot ${CLUSTER_NAME}"
+      cmd="bash $0 robot ${CLUSTER_NAME} $(printf \\r)"
       screen -x -S "${ROBOT_SCREEN_NAME}" -p 0 -X stuff "${cmd}"
       echo "存档 ${CLUSTER_NAME} 聊天互动功能已后台启动"
       _printLog "存档 ${CLUSTER_NAME} 聊天互动功能已后台启动" "${ROBOT_LOG_FILE}"
@@ -1109,9 +1111,10 @@ func_robotSwitch(){
     elif [ "${OPTION}" == "disable" ];then
       # 只有开启了才能正确关闭
       if [[ $(_checkPid "${ROBOT_SCREEN_NAME}") != ""  ]]; then
-        # 退出窗口命令
-        cmd_exit="exit$(printf \\r)"
-        screen -x -S "${ROBOT_SCREEN_NAME}" -p 0 -X stuff "${cmd_exit}"
+        # 直接杀死进程
+        ps -ef| grep "${ROBOT_SCREEN_NAME}"|grep -v grep |awk '{print $2}'|xargs kill -9
+        screen -wipe
+
         echo "存档 ${CLUSTER_NAME} 聊天互动功能已关闭"
         _printLog "存档 ${CLUSTER_NAME} 聊天互动功能已关闭" "${ROBOT_LOG_FILE}"
 
