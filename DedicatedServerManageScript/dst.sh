@@ -1049,6 +1049,23 @@ func_robot(){
 
         city_name=${content//天气/}
         # 根据列表文件获取cityId
+        cityListUrl="https://raw.githubusercontent.com/clcaod/DoNotStarveTogether/main/DedicatedServerManageScript/cityList.txt"
+        if [ ! -f "cityList.txt" ]; then
+            for (( i = 0; i < 5; i++ )); do
+                wget ${cityListUrl} >> /dev/null
+                if [ -f "cityList.txt" ]; then
+                  _printLog "加载cityList.txt文件成功" "${ROBOT_LOG_FILE}"
+                  break
+                fi
+            done
+            if [ ! -f "cityList.txt" ]; then
+              echo "多次尝试加载城市ID列表失败，请稍后重试"
+              ehco "自查服务启动失败"
+              _printLog "多次尝试加载城市ID列表失败,本次启动自查服务失败" "${ROBOT_LOG_FILE}"
+              exit 1
+            fi
+        fi
+
         cityId=$(grep "=${city_name}$" cityList.txt |awk -F= '{print $1}')
         echo "存档 ${CLUSTER_NAME} 互动 「@查询天气」, 读取城市名:${city_name}, 城市ID:${cityId}"
         _printLog "检测到存档 ${CLUSTER_NAME} 互动 「@查询天气」, 读取城市名:${city_name}, 城市ID:${cityId}" "${ROBOT_LOG_FILE}"
