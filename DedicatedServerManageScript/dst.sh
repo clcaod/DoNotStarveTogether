@@ -282,10 +282,11 @@ _robotUsageTip(){
   echo "Commands:"
   echo "  robot     对存档开启自查询功能"
   echo "            用法："
-  echo "                bash $0 robot <cluster_name> "
+  echo "                bash $0 robot <cluster_name> [enable|disable]"
   echo "            举例："
-  echo "                bash $0 robot Cluster_1           对 Cluster_1 存档开启自查功能"
-  echo "                建议使用 nohup bash $0 robot Cluster_1 & 此命令可将服务挂在后台使用"
+  echo "                bash $0 robot Cluster_1                 对 Cluster_1 存档开启自查功能"
+  echo "                bash $0 robot Cluster_1 enable          对 Cluster_1 存档后台开启自查功能"
+  echo "                bash $0 robot Cluster_1 disable         对 Cluster_1 存档后台关闭自查功能"
   exit 1
 }
 
@@ -533,10 +534,11 @@ _printfStatus(){
   title3="最大人数"
   title4="运行状态"
   title5="更新自启动"
-  title6="世界名称"
+  title6="自查功能"
+  title7="世界名称"
 
   # 打印表头
-  printf "%-10s\t %-10s\t %-10s\t %-10s\t %-10s\t %s\n" $title1 $title2 $title3 $title4 $title5 $title6
+  printf "%-10s\t %-10s\t %-10s\t %-10s\t %-10s\t %-10s\t %s\n" $title1 $title2 $title3 $title4 $title5 $title6 $title7
   # 数据打印
   cluster_arr=($(_listDir "${CLUSTER_PATH}"))
   if [ -n "${CLUSTER_NAME}" ]; then
@@ -557,8 +559,14 @@ _printfStatus(){
       autoStart="TRUE"
     fi
 
+    # 自查功能是否启动
+    isRobotEnable="未启动"
+    if [ "$(_checkPid "${dir}_ROBOT")" != "" ]; then
+      isRobotEnable="已启动"
+    fi
+
     # 打印数据
-    printf "%-10s\t %-10s\t %-10s\t %-10s\t %-10s\t %s\n" "$dir" "$game_mode" "$max_players" "$status" "$autoStart" "$cluster_name"
+    printf "%-10s\t %-10s\t %-10s\t %-10s\t %-10s\t %-10s\t %s\n" "$dir" "$game_mode" "$max_players" "$status" "$autoStart" "$isRobotEnable" "$cluster_name"
   done
 }
 
@@ -1006,27 +1014,26 @@ func_robot(){
 
   # 文件md5状态记录
   preview_md5="$(find "${chat_file}"|xargs md5sum |awk '{print $1}')"
-  current_md5=""
 
   while true;do
     # 根据文件的md5值判断文件是否有进行修改
     current_md5="$(find "${chat_file}"|xargs md5sum |awk '{print $1}')"
     if [[ "${current_md5}" != "${preview_md5}" ]];then
       content=$(tail -1 "${chat_file}" | awk -F@ '{print $2}' |sed 's/[[:space:]]//g')
+      preview_md5="${current_md5}"
 
       # 功能1：查询时间
       if [[  "${content}" =~ "时间"  ]];then
-        preview_md5=${current_md5}
         time=$(date '+%Y-%m-%d %H:%M:%S')
         feed_back="当前时间:${time}"
         func_sendMsg "${CLUSTER_NAME}" "${feed_back}"
         echo "存档 ${CLUSTER_NAME} 互动 「@查询时间」"
         _printLog "检测到存档 ${CLUSTER_NAME} 互动 「@查询时间」,回馈内容:${feed_back}" "${ROBOT_LOG_FILE}"
+
       fi
 
       # 功能2：查询天气
       if [[ "$content" =~ "天气" ]];then
-        preview_md5=${current_md5}
         # 查询天气的URL前缀
         url_pre="http://www.weather.com.cn/data/cityinfo"
 
@@ -1076,6 +1083,55 @@ func_robot(){
 
     fi
   done
+}
+
+# 游戏内聊天互动开关
+func_robotSwitch(){
+  CLUSTER_NAME=$1
+  OPTION=$2
+
+  ROBOT_SCREEN_NAME="${CLUSTER_NAME}_ROBOT"
+
+  # OPTION为 enable|disable 其他则给出错误提示
+  if [ $(_checkPid "${CLUSTER_NAME}") != "" ]; then
+    # 开启后台自查功能
+    if [ "${OPTION}" == "enable" ]; then
+      # 开启守护窗口
+      screen -dmS "${ROBOT_SCREEN_NAME}"
+      cmd="bash $0 robot ${CLUSTER_NAME}"
+      screen -x -S "${ROBOT_SCREEN_NAME}" -p 0 -X stuff "${cmd}"
+      echo "存档 ${CLUSTER_NAME} 聊天互动功能已后台启动"
+      _printLog "存档 ${CLUSTER_NAME} 聊天互动功能已后台启动" "${ROBOT_LOG_FILE}"
+
+      echo ""
+      echo "使用命令: bash $0 status 可查看所有存档状态信息"
+    # 关闭后台自查功能
+    elif [ "${OPTION}" == "disable" ];then
+      # 只有开启了才能正确关闭
+      if [ $(_checkPid "${ROBOT_SCREEN_NAME}") != ""  ]; then
+        # 退出窗口命令
+        cmd_exit="exit$(printf \\r)"
+        screen -x -S "${ROBOT_SCREEN_NAME}" -p 0 -X stuff "${cmd_exit}"
+        echo "存档 ${CLUSTER_NAME} 聊天互动功能已关闭"
+        _printLog "存档 ${CLUSTER_NAME} 聊天互动功能已关闭" "${ROBOT_LOG_FILE}"
+
+        echo ""
+        echo "使用命令: bash $0 status 可查看所有存档状态信息"
+      else
+        echo "存档 ${CLUSTER_NAME} 尚未启动自查功能。"
+        _printLog "存档 ${CLUSTER_NAME} 尚未启动自查功能。" "${ROBOT_LOG_FILE}"
+
+        echo ""
+        echo "使用命令: bash $0 status 可查看所有存档状态信息"
+      fi
+    # 其他
+    else
+      _robotUsageTip
+    fi
+  else
+    echo "存档 ${CLUSTER_NAME} 尚未运行，请确保游戏已启动，再尝试自查功能。"
+    _printLog "存档 ${CLUSTER_NAME} 尚未运行，请确保游戏已启动，再尝试自查功能。" "${ROBOT_LOG_FILE}"
+  fi
 }
 
 # 脚本目录判断
@@ -1196,7 +1252,13 @@ case "${COMMAND}" in
 	    _robotUsageTip
 	  fi
 
-  	func_robot "${CLUSTER_NAME}"
+	  # 无参数则直接启动，有参数则后台启动
+	  if [ -z "${OPTION}" ];then
+  	  func_robot "${CLUSTER_NAME}"
+  	else
+  	  func_robotSwitch "${CLUSTER_NAME}" "${OPTION}"
+	  fi
+
   	;;
 	*)
 		_simpleUsageTip
