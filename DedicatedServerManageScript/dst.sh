@@ -996,17 +996,17 @@ func_robot(){
     exit 1
   fi
 
-  # 文件md5状态记录
-  preview_md5="$(find "${chat_file}"|xargs md5sum |awk '{print $1}')"
-  current_md5=""
-  time=$(date '+%Y-%m-%d %H:%M:%S')
-
   # 游戏公告
   echo "存档 ${CLUSTER_NAME} 已开启自查服务。"
   echo "发送游戏公告..."
   func_sendMsg "${CLUSTER_NAME}" "当前时间:${time}"
   func_sendMsg "${CLUSTER_NAME}" "本房间已开启自查服务(测试阶段)，输入「@时间」「@XX天气」获取对应信息。"
   echo "等待玩家自查..."
+
+  # 文件md5状态记录
+  preview_md5="$(find "${chat_file}"|xargs md5sum |awk '{print $1}')"
+  current_md5=""
+  time=$(date '+%Y-%m-%d %H:%M:%S')
 
   while true;do
     # 根据文件的md5值判断文件是否有进行修改
