@@ -997,6 +997,7 @@ func_robot(){
   fi
 
   # 游戏公告
+  time=$(date '+%Y-%m-%d %H:%M:%S')
   echo "存档 ${CLUSTER_NAME} 已开启自查服务。"
   echo "发送游戏公告..."
   func_sendMsg "${CLUSTER_NAME}" "当前时间:${time}"
@@ -1006,7 +1007,6 @@ func_robot(){
   # 文件md5状态记录
   preview_md5="$(find "${chat_file}"|xargs md5sum |awk '{print $1}')"
   current_md5=""
-  time=$(date '+%Y-%m-%d %H:%M:%S')
 
   while true;do
     # 根据文件的md5值判断文件是否有进行修改
@@ -1068,6 +1068,7 @@ func_robot(){
             feed_back="未匹配到当前城市的ID呢"
             echo "解析json数据存在空值!"
             _printLog "解析json数据存在空值，反馈内容:${feed_back}" "${ROBOT_LOG_FILE}"
+            func_sendMsg "${CLUSTER_NAME}" "${feed_back}"
           fi
         fi
       fi
