@@ -1138,7 +1138,7 @@ func_robotSwitch(){
       if [[ $(_checkPid "${ROBOT_SCREEN_NAME}") != ""  ]]; then
         # 直接杀死进程
         ps -ef| grep "${ROBOT_SCREEN_NAME}"|grep -v grep |awk '{print $2}'|xargs kill -9
-        screen -wipe
+        screen -wipe >> /dev/null
 
         echo "存档 ${CLUSTER_NAME} 聊天互动功能已关闭"
         _printLog "存档 ${CLUSTER_NAME} 聊天互动功能已关闭" "${ROBOT_LOG_FILE}"
