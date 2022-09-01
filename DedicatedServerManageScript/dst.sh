@@ -770,8 +770,6 @@ func_sendMsg(){
 
   # 只有主世界存在才会发送消息（不支持仅给洞穴发送消息）
   if [[ $(_checkPid "${CLUSTER_NAME}") != "" ]]; then
-    # 回显世界信息
-    _displayWorldInfo "${CLUSTER_NAME}"
 
     MASTER_SCREEN_NAME="${CLUSTER_NAME}_Master"
     cmd="c_announce(\"${MSG}\")$(printf \\r)"
@@ -1004,8 +1002,11 @@ func_robot(){
   time=$(date '+%Y-%m-%d %H:%M:%S')
 
   # 游戏公告
+  echo "存档 ${CLUSTER_NAME} 已开启自查服务。"
+  echo "发送游戏公告..."
   func_sendMsg "${CLUSTER_NAME}" "当前时间:${time}"
   func_sendMsg "${CLUSTER_NAME}" "本房间已开启自查服务(测试阶段)，输入「@时间」「@XX天气」获取对应信息。"
+  echo "等待玩家自查..."
 
   while true;do
     # 根据文件的md5值判断文件是否有进行修改
@@ -1018,6 +1019,7 @@ func_robot(){
         time=$(date '+%Y-%m-%d %H:%M:%S')
         feed_back="当前时间:${time}"
         func_sendMsg "${CLUSTER_NAME}" "${feed_back}"
+        echo "存档 ${CLUSTER_NAME} 互动 「@查询时间」"
         _printLog "检测到存档 ${CLUSTER_NAME} 互动 「@查询时间」,回馈内容:${feed_back}" "${ROBOT_LOG_FILE}"
       fi
       preview_md5=${current_md5}
@@ -1030,11 +1032,13 @@ func_robot(){
         city_name=${content//天气/}
         # 根据列表文件获取cityId
         cityId=$(grep "=${city_name}$" cityList.txt |awk -F= '{print $1}')
+        echo "存档 ${CLUSTER_NAME} 互动 「@查询天气」, 读取城市名:${city_name}, 城市ID:${cityId}"
         _printLog "检测到存档 ${CLUSTER_NAME} 互动 「@查询天气」, 读取城市名:${city_name}, 城市ID:${cityId}" "${ROBOT_LOG_FILE}"
 
         if [ -z "${cityId}"  ];then
           feed_back="未匹配到当前城市的ID呢"
           func_sendMsg "${CLUSTER_NAME}" "${feed_back}"
+          echo "查询城市失败,未匹配到当前城市的ID"
           _printLog "查询城市失败，回馈内容:${feed_back}" "${ROBOT_LOG_FILE}"
         else
           # 完整的url
@@ -1044,6 +1048,7 @@ func_robot(){
           # {"weatherinfo":{"city":"深圳","cityid":"101280601","temp1":"24℃","temp2":"30℃","weather":"阵雨转大雨","img1":"n3.gif","img2":"d9.gif","ptime":"18:00"}}
           weather_json=$(curl "${url}")
 
+          echo "请求网址 「${url}」返回的 json 数据 「${weather_json}」"
           _printLog "请求网址 「${url}」返回的 json 数据 「${weather_json}」" "${ROBOT_LOG_FILE}"
 
           # 解析
@@ -1051,14 +1056,17 @@ func_robot(){
           temp2=$(echo "${weather_json}" |sed 's/,/\n/g' | grep temp2 |sed 's/"//g'|awk -F: '{print $2}')
           weather=$(echo "${weather_json}" |sed 's/,/\n/g' | grep '"weather"' |sed 's/"//g'|awk -F: '{print $2}')
 
+          echo "解析json数据: temp1=${temp1}, temp2=${temp2}, weather=${weather}"
           _printLog "解析json数据: temp1=${temp1}, temp2=${temp2}, weather=${weather}" "${ROBOT_LOG_FILE}"
           # 给服务器发送消息
           if [ -n "${temp1}" ] && [ -n "${temp2}" ] && [ -n "${weather}" ]; then
             feed_back="${city_name}今天${weather},最低温度${temp1},最高温度${temp2}"
             func_sendMsg "${CLUSTER_NAME}" "${feed_back}"
+            echo "查询${content}成功,返回内容:${feed_back}"
             _printLog "查询${content}成功,返回内容:${feed_back}" "${ROBOT_LOG_FILE}"
           else
             feed_back="未匹配到当前城市的ID呢"
+            echo "解析json数据存在空值!"
             _printLog "解析json数据存在空值，反馈内容:${feed_back}" "${ROBOT_LOG_FILE}"
           fi
         fi
