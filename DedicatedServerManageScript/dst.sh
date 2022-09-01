@@ -1016,16 +1016,17 @@ func_robot(){
 
       # 功能1：查询时间
       if [[  "${content}" =~ "时间"  ]];then
+        preview_md5=${current_md5}
         time=$(date '+%Y-%m-%d %H:%M:%S')
         feed_back="当前时间:${time}"
         func_sendMsg "${CLUSTER_NAME}" "${feed_back}"
         echo "存档 ${CLUSTER_NAME} 互动 「@查询时间」"
         _printLog "检测到存档 ${CLUSTER_NAME} 互动 「@查询时间」,回馈内容:${feed_back}" "${ROBOT_LOG_FILE}"
       fi
-      preview_md5=${current_md5}
 
       # 功能2：查询天气
       if [[ "$content" =~ "天气" ]];then
+        preview_md5=${current_md5}
         # 查询天气的URL前缀
         url_pre="http://www.weather.com.cn/data/cityinfo"
 
